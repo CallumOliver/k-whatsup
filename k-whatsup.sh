@@ -5,6 +5,10 @@ DIRECTORY="/tmp/k-whatsup-dir"
 
 #Defining Functions
 
+pause_function () {
+	read -p "Press any key to continue... " -n1 -s
+	echo  ""
+}
 
 converse_function () {
   echo -e $say_var
@@ -32,6 +36,13 @@ scan_function () {
 	echo "Scanning begun."
 	#date
 	echo $(date) > "$DIRECTORY/date.txt"
+	#important versions
+	echo "Versions" > "$DIRECTORY/get-versions.txt"
+	echo "AWS VPC CNI:" >> "$DIRECTORY/get-versions.txt"
+	kubectl describe daemonset aws-node --namespace kube-system | grep Image | cut -d "/" -f 2 >> "$DIRECTORY/get-versions.txt"
+	echo "AWS EBS :" >> "$DIRECTORY/get-versions.txt"
+	echo "AWS EFS :" >> "$DIRECTORY/get-versions.txt"
+	echo "AWS LB :" >> "$DIRECTORY/get-versions.txt"
 	#namespace
 	kubectl get ns > "$DIRECTORY/get-namespace.txt"
 	#nodes
@@ -93,6 +104,18 @@ analyze_function () {
 ##
 #Main code
 #Sets inital converser function variables
+# Check if yes all argument supplied to skip question loop
+if [[ $* == *'-y'* ]]; then
+  echo "Skipping questions, Running in yes mode"
+  scan_function
+  pause_function
+  analyze_function
+  pause_function
+  #terminate after running
+  exit 0
+fi
+
+# Run main questioning loop
 me=$(whoami)
 say_var="Welcome to New Box Helper\nScript running as user: $me\n"
 ask_var="Proceed with a scan? (yes|no|quit)"
