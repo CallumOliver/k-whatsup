@@ -47,7 +47,7 @@ scan_function () {
 	kubectl get ns > "$DIRECTORY/get-namespace.txt"
 	#nodes
 	kubectl get nodes > "$DIRECTORY/get-nodes.txt"
-	echo -ne "Scanning nodes ."
+	echo -ne "Scanning all nodes ."
 	for i in $(grep -v STATUS "$DIRECTORY/get-nodes.txt" | awk '{print $1}') ; do
 		kubectl describe node $i > "$DIRECTORY/nodes/describe-$i.txt"
 		echo -n "."
@@ -57,11 +57,12 @@ scan_function () {
 
 	#pods
 	kubectl get pods -A > "$DIRECTORY/get-pods.txt"
-	echo -ne "Scanning pods ."
-	for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | awk '{print $1, $2}' | tr ' ' '+') ; do
+	echo -ne "Scanning unhealthy pods."
+	for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep -v " Running " | awk '{print $1, $2}' | tr ' ' '+')  ; do
 		loop_ns="$(echo $i | cut -d '+' -f 1)"
 		loop_pod="$(echo $i | cut -d '+' -f 2)"
 		kubectl describe pod "$loop_pod" -n "$loop_ns" > "/tmp/k-whatsup-dir/pods/describe_$loop_ns_$loop_pod.txt"
+		kubectl get pod "$loop_pod" -n "$loop_ns" -o yaml > "/tmp/k-whatsup-dir/pods/get_yaml_$loop_ns_$loop_pod.txt"
 		echo -n "."
 	done
 	echo -ne ".|\n"
@@ -87,14 +88,27 @@ analyze_function () {
 	not_ready_pods="$(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep -v " Running " | wc -l)"
 	ready_pods="$(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep " Running " | wc -l)"
 	echo -e "\npod status:\nNot running pods: $not_ready_pods \nRunning pods: $ready_pods"
-	for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep -v " Running " | awk '{print $1, $2}' | tr ' ' '+') ; do
-		loop_ns="$(echo $i | cut -d '+' -f 1)"
-		loop_pod="$(echo $i | cut -d '+' -f 2)"
-		echo "---"
-		grep -e "^Name:" "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt"
-		tac "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt" | sed -e '/Events:/q' | tac
-		echo "---"
-	done
+    for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | awk '{print $1, $2, $3, $4}' | tr ' ' '+') ; do
+      loop_ns="$(echo $i | cut -d '+' -f 1)"
+      loop_pod="$(echo $i | cut -d '+' -f 2)"
+      loop_readynumber="$(echo $i | cut -d '+' -f 3)"
+      loop_status="$(echo $i | cut -d '+' -f 4)"
+      if [[ $(expr $(echo $loop_readynumber | awk '{gsub(/.{1}/,"& ")}1')) != 1 ]]; then 
+        loop_status="NotEntirelyRunning"
+      fi
+      if [[ $loop_status != "Running" ]]; then
+    		echo "---"
+    		grep -e "^Name:" "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt"
+    		kubectl top pod "$loop_pod" -n "$loop_ns"
+			if [[ $loop_status == "NotEntirelyRunning" ]]; then
+				echo "Number of ready pods no equial to desriced number $loop_readynumber"
+			done
+    		tac "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt" | sed -e '/Events:/q' | tac
+    		echo "---"
+      fi
+    done
+
+
 	
 	echo analyze ran
 }
