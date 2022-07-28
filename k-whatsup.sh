@@ -76,6 +76,7 @@ analyze_function () {
 	not_ready_nodes="$(grep -v STATUS "$DIRECTORY/get-nodes.txt" | grep -v " Ready " | wc -l)"
 	ready_nodes="$(grep -v STATUS "$DIRECTORY/get-nodes.txt" | grep " Ready " | wc -l)"
 	echo -e "\nnodes status:\nNot ready nodes: $not_ready_nodes \nReady nodes: $ready_nodes"
+	kubectl top nodes
 	for i in $(grep -v STATUS "$DIRECTORY/get-nodes.txt" | grep -v " Ready " | cut -d ' ' -f 1) ; do
 		echo "---"
 		grep "Name:" "$DIRECTORY/nodes/describe-$i.txt"
@@ -88,22 +89,29 @@ analyze_function () {
 	not_ready_pods="$(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep -v " Running " | wc -l)"
 	ready_pods="$(grep -v STATUS "$DIRECTORY/get-pods.txt" | grep " Running " | wc -l)"
 	echo -e "\npod status:\nNot running pods: $not_ready_pods \nRunning pods: $ready_pods"
-    for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | awk '{print $1, $2, $3, $4}' | tr ' ' '+') ; do
+    for i in $(grep -v STATUS "$DIRECTORY/get-pods.txt" | awk '{print $1, $2, $3, $4, $5}' | tr ' ' '+') ; do
       loop_ns="$(echo $i | cut -d '+' -f 1)"
       loop_pod="$(echo $i | cut -d '+' -f 2)"
       loop_readynumber="$(echo $i | cut -d '+' -f 3)"
       loop_status="$(echo $i | cut -d '+' -f 4)"
+	  loop_restarts="$(echo $i | cut -d '+' -f 5)"
       if [[ $(expr $(echo $loop_readynumber | awk '{gsub(/.{1}/,"& ")}1')) != 1 ]]; then 
         loop_status="NotEntirelyRunning"
       fi
       if [[ $loop_status != "Running" ]]; then
     		echo "---"
     		grep -e "^Name:" "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt"
-    		kubectl top pod "$loop_pod" -n "$loop_ns"
+    		echo "Top:"
+			kubectl top pod "$loop_pod" -n "$loop_ns"
 			if [[ $loop_status == "NotEntirelyRunning" ]]; then
 				echo "Number of ready pods no equial to desriced number $loop_readynumber"
-			done
+			fi
+			if [[ $loop_restarts == "0" ]]; then
+				echo "Number of pod restarts is $loop_restarts"
+			fi
     		tac "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt" | sed -e '/Events:/q' | tac
+			echo "Recent logs:"
+			kubectl logs "$loop_pod" -n "$loop_ns" | tail
     		echo "---"
       fi
     done
@@ -131,7 +139,7 @@ fi
 
 # Run main questioning loop
 me=$(whoami)
-say_var="Welcome to New Box Helper\nScript running as user: $me\n"
+say_var="Welcome to New Box Helper\nScript running as user: $me\nInstall a metric server to your cluster for full functionality\n"
 ask_var="Proceed with a scan? (yes|no|quit)"
 not_scanned="yes"
 
