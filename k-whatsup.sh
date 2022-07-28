@@ -106,9 +106,12 @@ analyze_function () {
 			if [[ $loop_status == "NotEntirelyRunning" ]]; then
 				echo "Number of ready pods no equial to desriced number $loop_readynumber"
 			fi
+<<<<<<< HEAD
 			if [[ $loop_restarts == "0" ]]; then
 				echo "Number of pod restarts is $loop_restarts"
 			fi
+=======
+>>>>>>> 8aef7adfebf7d2ddcfd44bcab083eb4f3627b257
     		tac "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt" | sed -e '/Events:/q' | tac
 			echo "Recent logs:"
 			kubectl logs "$loop_pod" -n "$loop_ns" | tail
