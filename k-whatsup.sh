@@ -102,7 +102,7 @@ analyze_function () {
     		kubectl top pod "$loop_pod" -n "$loop_ns"
 			if [[ $loop_status == "NotEntirelyRunning" ]]; then
 				echo "Number of ready pods no equial to desriced number $loop_readynumber"
-			done
+			fi
     		tac "$DIRECTORY/pods/describe_$loop_ns_$loop_pod.txt" | sed -e '/Events:/q' | tac
     		echo "---"
       fi
